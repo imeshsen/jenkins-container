@@ -1,0 +1,28 @@
+Manifest-Version: 1.0
+Created-By: Maven Archiver 3.6.0
+Build-Jdk-Spec: 17
+Specification-Title: Pipeline: Job
+Specification-Version: 0.0
+Implementation-Title: Pipeline: Job
+Implementation-Version: 1459.v6c531091efcd
+Group-Id: org.jenkins-ci.plugins.workflow
+Artifact-Id: workflow-job
+Short-Name: workflow-job
+Long-Name: Pipeline: Job
+Url: https://github.com/jenkinsci/workflow-job-plugin
+Compatible-Since-Version: 2.26
+Plugin-Version: 1459.v6c531091efcd
+Hudson-Version: 2.481
+Jenkins-Version: 2.481
+Plugin-Dependencies: ionicons-api:74.v93d5eb_813d5f,workflow-api:1336.ve
+ e415d95c521,workflow-step-api:678.v3ee58b_469476,workflow-support:926.v
+ 9f4f9b_b_98c19
+Plugin-Developers: 
+Plugin-License-Name: MIT License
+Plugin-License-Url: https://opensource.org/licenses/MIT
+Plugin-ScmConnection: scm:git:https://github.com/jenkinsci/workflow-job-
+ plugin.git
+Plugin-ScmTag: 6c531091efcd3332564d508814515ad2e9d1ec8d
+Plugin-ScmUrl: https://github.com/jenkinsci/workflow-job-plugin
+Implementation-Build: 6c531091efcd3332564d508814515ad2e9d1ec8d
+
