@@ -1,2 +1,1 @@
-admin
-1996
+Create a directory called "jenkins_home"
