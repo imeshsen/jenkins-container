@@ -1,16 +1,16 @@
 Steps..................................
 
-Create a directory called "jenkins_home"
+Create a directory called "jenkins_home" to save your data
 
-run "grep docker /etc/group" on your host machine and modify dockerfile with output id
+Run "grep docker /etc/group" on your host machine and modify dockerfile with output id (example: 984)
 
-example.............................................
+Example.............................................
 
 RUN groupadd -g 984 docker || true
 984 is the id here
 ...................................................
 
 
-run docker compose build
+Run docker compose build
 
-run docker compose up -d
+Run docker compose up -d
