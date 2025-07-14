@@ -15,8 +15,6 @@ pipeline {
         stage('Build BAR') {
             steps {
                 echo "Building BAR file using ibmint..."
-                // Run an ibmint container, sharing the Jenkins workspace volume.
-                // This ensures ibmint can access the source code and write the BAR file.
                 sh '''
                     docker images
                     pwd
@@ -37,29 +35,29 @@ pipeline {
             steps {
                 script {
                     echo "Ensuring no old ACE server container or network is running..."
-                    // Stop and remove any existing container with the same name to ensure a clean start
+
                     sh 'docker rm -f ace-server || true' // '|| true' prevents pipeline failure if container doesn't exist
-                    // Remove the custom network if it exists from a previous run
+
                     sh 'docker network rm ace-network || true'
 
                     echo "Creating a custom Docker network for ACE and ibmint containers..."
+
                     sh 'docker network create ace-network'
 
                     echo "Starting IBM App Connect Enterprise integration server container on custom network..."
-                    // Run the ACE container in detached mode (-d).
-                    // Map port 7600 (ACE admin REST API) from container to host.
-                    // Share the Jenkins workspace volume so the BAR file is accessible inside the ACE container.
-                    // IMPORTANT: Added -e LICENSE=accept to accept the IBM license terms.
-                    // IMPORTANT: Added --network ace-network to place it on the custom network.
+                    
                     sh 'docker run -d --name ace-server -p 7600:7600 --volumes-from jenkins -e LICENSE=accept --network ace-network ibmcom/ace:latest '
                     
                     echo "Waiting for ACE server to start up (90 seconds)..."
                     // IMPORTANT: This 'sleep' is a simple wait. For production, consider a more robust health check
                     // (e.g., polling the ACE REST API or checking container logs for "ready" messages).
                     sleep 90
+
                     echo "ACE server should be up and running now."
+
                     echo "Fetching ACE server logs for verification..."
-                    sh 'docker logs ace-server' // Fetch logs after waiting
+
+                    sh 'docker logs ace-server' 
                 }
             }
         }
@@ -67,10 +65,7 @@ pipeline {
         stage('Deploy BAR') {
             steps {
                 echo "Deploying BAR file to ACE integration server..."
-                // Run another ibmint container to perform the deployment.
-                // It also shares the Jenkins workspace volume to access the BAR file.
-                // It connects to the 'ace-server' container using its name, as both are on the same Docker network.
-                // 'IBNODE' is a common default integration server name for the ibmcom/ace image.
+                
                 sh '''
                     docker run --rm \\
                       --volumes-from jenkins \\
@@ -88,8 +83,11 @@ pipeline {
         //     steps {
         //         script {
         //             echo "Stopping and removing ACE integration server container..."
+
         //             sh 'docker stop ace-server' // Stop the container gracefully
+
         //             sh 'docker rm ace-server'   // Remove the container
+
         //             echo "ACE server container cleaned up."
         //         }
         //     }
@@ -100,6 +98,7 @@ pipeline {
     //     always {
     //         script {
     //             echo "Performing post-build cleanup for ACE server (ensuring it's removed)..."
+
     //             // This ensures the container is removed even if a previous stage failed.
     //             sh 'docker rm -f ace-server || true'
     //         }
