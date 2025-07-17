@@ -1,0 +1,47 @@
+pipeline {
+    agent any
+    
+    triggers {
+    GenericTrigger(
+     genericVariables: [
+      [key: 'repo', value: '$.repository.clone_url'],[key: 'ref', value: '$.ref'],
+     ],
+
+     token: 'abc123',
+     tokenCredentialId: '',
+
+     printContributedVariables: true,
+     printPostContent: true,
+
+     silentResponse: false,
+     
+     shouldNotFlatten: false,
+
+     regexpFilterText: '$ref',
+    )
+  }
+
+    stages {
+        
+    stage('Some step') {
+      steps {
+        sh '''
+        echo "$ref"
+        echo "$ref" | awk '{sub("refs/heads/", ""); print}'
+        '''
+        // sh 'echo "$ref" | awk '{sub("refs/heads/", ""); print}''
+      }
+    }
+        
+        stage('Clone Repo') {
+            steps {
+                echo "Cloning repository..."
+                git credentialsId: 'github-token',
+                    url: '$repo',
+                    branch: 'CICD_TEST'
+            }
+        }
+
+}
+}
+
