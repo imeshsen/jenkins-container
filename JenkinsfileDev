@@ -1,0 +1,54 @@
+pipeline {
+    agent any
+
+    stages {
+        
+        stage('Clone Repo') {
+            steps {
+                echo "Cloning repository..."
+                git credentialsId: 'github-token',
+                    url: 'https://github.com/n-ablePrivateLimitedColomboSriLanka/DFCC_ACE_COLLATERELS.git',
+                    branch: 'CICD_TEST'
+                echo "Repository cloned Branch is."
+            }
+        }
+
+        stage('Build BAR') {
+            steps {
+                echo "Building BAR file using ibmint..."
+                sh '''
+                    docker images
+                    pwd
+                    ls -l
+                    docker run --rm \\
+                      --volumes-from jenkins \\
+                      ibmint:latest package \\
+                      --input-path /var/jenkins_home/workspace/dfcc-demo \\
+                      --output-bar-file /var/jenkins_home/workspace/dfcc-demo/MyIntegrationTestProject.bar \\
+                      --do-not-compile-java
+                    echo "BAR file built: MyIntegrationTestProject.bar"
+                    ls -l /var/jenkins_home/workspace/dfcc-demo/MyIntegrationTestProject.bar
+                '''
+            }
+        }
+
+        stage('Deploy BAR to dev') {
+            steps {
+                echo "Deploying BAR file to ACE integration server..."
+                
+                sh '''
+                    docker run --rm \\
+                      --volumes-from jenkins \\
+                      --network ace-network \\
+                      ibmint:latest deploy \\
+                      --input-bar-file /var/jenkins_home/workspace/dfcc-demo/MyIntegrationTestProject.bar \\
+                      --output-host 10.18.51.171 \\
+                      --output-port 4414 \\
+                      --output-server devserver1
+                    echo "BAR file deployment initiated successfully."
+                '''
+            }
+        }
+        
+    
+}
