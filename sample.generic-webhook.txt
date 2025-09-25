@@ -1,1 +1,5 @@
 curl -X POST  -H "Content-Type: application/json"   -d '{"ref": "https://github.com/imeshsen/mqsi_image.git" }'  -vs "http://localhost:8080/generic-webhook-trigger/invoke?token=abc123&requestWithNumber=nbr%20123&requestWithString=a%20string"
+
+curl -X POST  -H "Content-Type: application/json"   -d '{"repository": {"name": "DFCC_ACE_COLLATERELS","clone_url": "https://github.com/imeshsen/DFCC_ACE_COLLATERELS.git"}}'  -vs "http://localhost:8080/generic-webhook-trigger/invoke?token=abc123&requestWithNumber=nbr%20123&requestWithString=a%20string"
+
+{"repository": {"name": "DFCC_ACE_COLLATERELS","clone_url": "https://github.com/imeshsen/DFCC_ACE_COLLATERELS.git"}}

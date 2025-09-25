@@ -1,1 +1,0 @@
-curl -X POST  -H "Content-Type: application/json"   -d '{"ref": "https://github.com/imeshsen/mqsi_image.git" }'  -vs "http://localhost:8080/generic-webhook-trigger/invoke?token=abc123&requestWithNumber=nbr%20123&requestWithString=a%20string"
