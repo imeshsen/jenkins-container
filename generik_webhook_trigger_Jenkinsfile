@@ -2,7 +2,19 @@
 
 pipeline {
     agent any
+    
+    parameters {
+        choice(
+            name: 'TARGET_ENV',
+            choices: ['dev', 'sitbr1', 'sitbr2', 'uatbr1', 'uatbr2'],
+            description: 'Select the target environment to deploy to'
+        )
+    }
 
+    // parameters {
+    //         string(name: 'TARGET_ENV', defaultValue: 'dev', description: 'Target environment to deploy to (e.g., dev, qa, prod)')
+    //     }
+    
     triggers {
         GenericTrigger(
             genericVariables: [
@@ -20,7 +32,7 @@ pipeline {
     }
 
     stages {
-
+        
         stage('User Input - Select Environment') {
             steps {
                 script {
@@ -55,59 +67,15 @@ pipeline {
                 buildBar()
             }
         }
-        
         stage('Override BAR') {
             steps {
-                overrideBar('dev')
+                overrideBar(params.TARGET_ENV)
             }
         }
-
-        // stage('Start ACE Integration Server') {
-        //     steps {
-        //         script {
-        //             echo "Ensuring no old ACE server container or network is running..."
-
-        //             sh 'docker rm -f ace-server || true' // '|| true' prevents pipeline failure if container doesn't exist
-
-        //             sh 'docker network rm ace-network || true'
-
-        //             echo "Creating a custom Docker network for ACE and ibmint containers..."
-
-        //             sh 'docker network create ace-network'
-
-        //             echo "Starting IBM App Connect Enterprise integration server container on custom network..."
-                    
-        //             sh 'docker run -d --name ace-server -p 7600:7600 --volumes-from jenkins -e LICENSE=accept --network ace-network ibmcom/ace:latest '
-                    
-        //             echo "Waiting for ACE server to start up (30 seconds)..."
-        //             // IMPORTANT: This 'sleep' is a simple wait. For production, consider a more robust health check
-        //             // (e.g., polling the ACE REST API or checking container logs for "ready" messages).
-        //             sleep 30
-
-        //             echo "ACE server should be up and running now."
-
-        //             echo "Fetching ACE server logs for verification..."
-
-        //             sh 'docker logs ace-server' 
-        //         }
-        //     }
-        // }
-
-        // stage('Deploy BAR') {
-        //     steps {
-        //         echo "Deploying BAR file to ACE integration server..."
-                
-        //         sh '''
-        //             docker run --rm \\
-        //               --volumes-from jenkins \\
-        //               --network ace-network \\
-        //               ibmint:latest deploy \\
-        //               --input-bar-file /var/jenkins_home/workspace/generic-webhook-trigger-pipeline/$name.bar \\
-        //               --output-host ace-server \\
-        //               --output-port 7600
-        //             echo "BAR file deployment initiated successfully."
-        //         '''
-        //     }
-        // }
+        stage('Deploy BAR') {
+            steps {
+                deployBar(params.TARGET_ENV)
+            }
+        }
     }
 }
