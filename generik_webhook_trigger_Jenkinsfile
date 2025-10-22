@@ -20,6 +20,26 @@ pipeline {
     }
 
     stages {
+
+        stage('User Input - Select Environment') {
+            steps {
+                script {
+                    // Pause pipeline and ask for environment selection
+                    env.TARGET_ENV = input(
+                        id: 'userInput', 
+                        message: 'Select the target environment for deployment:',
+                        parameters: [
+                            choice(
+                                name: 'TARGET_ENV',
+                                choices: ['dev', 'sitbr1', 'sitbr2', 'uatbr1', 'uatbr2'],
+                                description: 'Choose the environment to deploy to'
+                            )
+                        ]
+                    )
+                    echo "User selected environment: ${env.TARGET_ENV}"
+                }
+            }
+        }
         
         stage('Clone Repo') {
             steps {
