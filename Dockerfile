@@ -1,36 +1,37 @@
-# Dockerfile
 FROM jenkins/jenkins:lts
 
 USER root
 
-# Install dependencies for Docker CLI
-RUN apt-get update && \
-    apt-get install -y \
+# Install dependencies
+RUN apt-get update && apt-get install -y \
     ca-certificates \
     curl \
     gnupg \
-    lsb-release && \
-    rm -rf /var/lib/apt/lists/*
+    lsb-release \
+    && rm -rf /var/lib/apt/lists/*
 
-# Add Docker's official GPG key
+# Add Docker GPG key (NON-INTERACTIVE FIX)
 RUN install -m 0755 -d /etc/apt/keyrings && \
-    curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    curl -fsSL https://download.docker.com/linux/debian/gpg | \
+    gpg --batch --yes --dearmor -o /etc/apt/keyrings/docker.gpg && \
+    chmod a+r /etc/apt/keyrings/docker.gpg
 
-# Add the Docker repository to Apt sources
+# Add Docker repo (force bullseye)
 RUN echo \
-  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian \
-  $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+  https://download.docker.com/linux/debian \
+  bullseye stable" | \
+  tee /etc/apt/sources.list.d/docker.list > /dev/null
 
-# Update apt index and install Docker CLI
+# Install Docker CLI only
 RUN apt-get update && \
     apt-get install -y docker-ce-cli && \
     rm -rf /var/lib/apt/lists/*
 
-# --- FIX: Create the 'docker' group with the host's Docker GID (984) ---
-# Removed ARG and hardcoded for simplicity, as we know the GID now.
+# Docker group with host GID
 RUN groupadd -g 984 docker || true
-
-# Add the jenkins user to the docker group
 RUN usermod -aG docker jenkins
+
+RUN usermod -aG 0 jenkins
 
 USER jenkins
