@@ -1,5 +1,5 @@
 # Dockerfile
-FROM jenkins/jenkins:dfcc
+FROM jenkins/jenkins:lts
 
 USER root
 
