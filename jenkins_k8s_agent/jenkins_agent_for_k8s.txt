@@ -1,0 +1,213 @@
+I've written the steps for you to run yourself, in order. They assume the VM is sp@192.168.56.107 and runs Ubuntu/Debian; on RHEL-family systems, use dnf in place of apt.
+
+---
+
+Step 0: Finish Jenkins setup
+
+1. Open http://localhost:8080 and paste the initial admin password 250429be967348c4af61ba2cf53c07d5.
+2. Choose Install suggested plugins and create your admin user.
+3. Go to Manage Jenkins → Plugins → Available and install SSH Build Agents if it isn't already there.
+
+---
+
+Step 1: Prepare the VM (run as sp)
+
+SSH in with ssh sp@192.168.56.107, then run:
+
+# Java for the agent (Jenkins 2.516 needs Java 17 or 21)
+sudo apt update && sudo apt install -y openjdk-17-jre-headless
+java -version
+
+# A real kubectl binary on PATH (the jenkins user can't use the 'minikube kubectl' alias)
+which kubectl || {
+  curl -LO "https://dl.k8s.io/release/$(curl -Ls https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+  sudo install -m 0755 kubectl /usr/local/bin/kubectl && rm kubectl
+}
+
+# The user the agent runs as
+sudo useradd -m -s /bin/bash jenkins
+
+# An SSH key that the Jenkins controller will use to log in as that user
+sudo -u jenkins bash -c '
+  mkdir -p ~/.ssh ~/agent && chmod 700 ~/.ssh
+  ssh-keygen -t ed25519 -f ~/.ssh/jenkins_agent -N "" -C jenkins-agent
+  cat ~/.ssh/jenkins_agent.pub >> ~/.ssh/authorized_keys
+  chmod 600 ~/.ssh/authorized_keys'
+
+# Print the private key. Copy all of it, including the BEGIN/END lines. You'll need it in Step 5.
+sudo cat /home/jenkins/.ssh/jenkins_agent
+
+---
+
+Step 2: Check that Jenkins can reach the VM
+
+On Windows (PowerShell), run:
+docker exec jenkins bash -c "timeout 3 bash -c '</dev/tcp/192.168.56.107/22' && echo REACHABLE"
+It should print REACHABLE. If it doesn't, the Docker container can't reach the VirtualBox host-only network. Check the VM's firewall (sudo ufw allow 22) and the VirtualBox network settings.
+
+---
+
+Step 3: Create the service account in minikube (on the VM, as sp)
+
+cat > jenkins-sa.yaml <<'EOF'
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: k8s
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: jenkins
+  namespace: k8s
+---
+# Full access to this namespace only (built-in "admin" role, bound per namespace)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: jenkins-admin
+  namespace: k8s
+subjects:
+  - kind: ServiceAccount
+    name: jenkins
+    namespace: k8s
+roleRef:
+  kind: ClusterRole
+  name: admin
+  apiGroup: rbac.authorization.k8s.io
+---
+# Long-lived token (K8s 1.24+ no longer creates one automatically)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: jenkins-token
+  namespace: k8s
+  annotations:
+    kubernetes.io/service-account.name: jenkins
+type: kubernetes.io/service-account-token
+EOF
+
+kubectl apply -f jenkins-sa.yaml
+
+---
+
+Step 4: Build a kubeconfig for the service account (on the VM, as sp)
+
+NS=k8s
+SERVER=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')
+CA=$(kubectl config view --raw --minify --flatten -o jsonpath='{.clusters[0].cluster.certificate-authority-data}')
+TOKEN=$(kubectl -n $NS get secret jenkins-token -o jsonpath='{.data.token}' | base64 -d)
+
+cat > jenkins-sa.kubeconfig <<EOF
+apiVersion: v1
+kind: Config
+clusters:
+- name: minikube
+  cluster:
+    server: $SERVER
+    certificate-authority-data: $CA
+users:
+- name: jenkins
+  user:
+    token: $TOKEN
+contexts:
+- name: jenkins@minikube
+  context:
+    cluster: minikube
+    user: jenkins
+    namespace: $NS
+current-context: jenkins@minikube
+EOF
+chmod 600 jenkins-sa.kubeconfig
+
+# Test it. The first two should succeed and the last should be refused:
+KUBECONFIG=jenkins-sa.kubeconfig kubectl auth can-i create deployments   # yes
+KUBECONFIG=jenkins-sa.kubeconfig kubectl get pods                        # works (may be empty)
+KUBECONFIG=jenkins-sa.kubeconfig kubectl get pods -n default             # Forbidden
+
+Copy the file to Windows so you can upload it. In PowerShell:
+scp sp@192.168.56.107:jenkins-sa.kubeconfig $env:USERPROFILE\Downloads\
+
+---
+
+Step 5: Add the two credentials in Jenkins
+
+Go to Manage Jenkins → Credentials → System → Global credentials → Add Credentials.
+
+┌─────────────────────────────┬────────────────────────┬───────────────────────────────────────────────────────────────────────────┐
+│            Kind             │           ID           │                                  Details                                  │
+├─────────────────────────────┼────────────────────────┼───────────────────────────────────────────────────────────────────────────┤
+│ SSH Username with private   │ minikube-vm-ssh        │ Username: jenkins. Private key: Enter directly, then paste the key from   │
+│ key                         │                        │ Step 1                                                                    │
+├─────────────────────────────┼────────────────────────┼───────────────────────────────────────────────────────────────────────────┤
+│ Secret file                 │ minikube-sa-kubeconfig │ Upload jenkins-sa.kubeconfig                                              │
+└─────────────────────────────┴────────────────────────┴───────────────────────────────────────────────────────────────────────────┘
+
+Then delete the copies that are no longer needed:
+- On Windows: delete Downloads\jenkins-sa.kubeconfig.
+- On the VM: run sudo rm /home/jenkins/.ssh/jenkins_agent and rm ~/jenkins-sa.kubeconfig. The public key stays in authorized_keys.
+
+---
+
+Step 6: Add the VM as an agent node
+
+Go to Manage Jenkins → Nodes → New Node. Name it minikube-vm, choose Permanent Agent, and fill in:
+
+┌────────────────────────────────┬─────────────────────────────────────────────────────────────────────────┐
+│             Field              │                                  Value                                  │
+├────────────────────────────────┼─────────────────────────────────────────────────────────────────────────┤
+│ Number of executors            │ 2                                                                       │
+├────────────────────────────────┼─────────────────────────────────────────────────────────────────────────┤
+│ Remote root directory          │ /home/jenkins/agent                                                     │
+├────────────────────────────────┼─────────────────────────────────────────────────────────────────────────┤
+│ Labels                         │ minikube                                                                │
+├────────────────────────────────┼─────────────────────────────────────────────────────────────────────────┤
+│ Usage                          │ Only build jobs with label expressions matching this node               │
+├────────────────────────────────┼─────────────────────────────────────────────────────────────────────────┤
+│ Launch method                  │ Launch agents via SSH                                                   │
+├────────────────────────────────┼─────────────────────────────────────────────────────────────────────────┤
+│ Host                           │ 192.168.56.107                                                          │
+├────────────────────────────────┼─────────────────────────────────────────────────────────────────────────┤
+│ Credentials                    │ jenkins (minikube-vm-ssh)                                               │
+├────────────────────────────────┼─────────────────────────────────────────────────────────────────────────┤
+│ Host Key Verification Strategy │ Manually trusted key, with "Require manual verification" left unchecked │
+├────────────────────────────────┼─────────────────────────────────────────────────────────────────────────┤
+│ Availability                   │ Keep this agent online as much as possible                              │
+└────────────────────────────────┴─────────────────────────────────────────────────────────────────────────┘
+
+Click Save, then open the node and check Log. The last line should say Agent successfully connected and online.
+
+---
+
+Step 7: Test with a pipeline
+
+Go to New Item → Pipeline and name it minikube-test. Use this script:
+
+pipeline {
+    agent { label 'minikube' }
+    stages {
+        stage('Cluster access via SA') {
+            steps {
+                withCredentials([file(credentialsId: 'minikube-sa-kubeconfig', variable: 'KUBECONFIG')]) {
+                    sh '''
+                        kubectl version
+                        kubectl auth can-i create deployments
+                        kubectl get all
+                        kubectl create deployment hello --image=nginx --dry-run=server -o name
+                    '''
+                }
+            }
+        }
+    }
+}
+
+When you click Build Now, it should run on minikube-vm and print yes and deployment.apps/hello. The --dry-run=server flag means nothing is actually created.
+
+---
+
+If something fails
+
+- Agent won't connect: check the node log. Permission denied means the key is wrong or authorized_keys has the wrong permissions. Java not found means Step 1's Java install didn't finish.
+- kubectl: not found: kubectl isn't in /usr/local/bin (Step 1).
+- Connection refused to 192.168.49.2:8443: minikube is stopped. Run minikube start as sp.
+- Unauthorized after minikube delete: recreating the cluster changes the token and CA. Redo Steps 3 and 4 and upload the new file to the minikube-sa-kubeconfig credential.
