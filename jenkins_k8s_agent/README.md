@@ -27,7 +27,19 @@ kubectl auth can-i list namespaces --as=system:serviceaccount:k8s:jenkins      #
 
 ## 3. Fill in the kubeconfig
 
-[`kube_config.yml`](kube_config.yml) is a template. Replace its three placeholders with the values from these commands:
+[`kube_config.yml`](kube_config.yml) is a template. Fill it into `jenkins-kubeconfig.yml` (git-ignored) using either option below.
+
+### Option A: script
+
+Uses your current `kubectl` context:
+
+```sh
+./generate-kubeconfig.sh
+```
+
+### Option B: manually
+
+Copy `kube_config.yml` to `jenkins-kubeconfig.yml` and replace the three placeholders:
 
 | Placeholder | Command | Notes |
 |---|---|---|
@@ -35,20 +47,26 @@ kubectl auth can-i list namespaces --as=system:serviceaccount:k8s:jenkins      #
 | `<CA_DATA>` | `kubectl get secret jenkins-token -n k8s -o jsonpath='{.data.ca\.crt}'` | Paste as-is (stays base64) |
 | `<TOKEN>` | `kubectl describe secret jenkins-token -n k8s` | Copy the `token:` value (already decoded) |
 
+> **Pasting long values:** `<CA_DATA>` and `<TOKEN>` are each one long line. Keep them on a single line with no breaks or spaces. To avoid terminal line-wrapping, save to a file and copy from an editor:
+> ```sh
+> kubectl get secret jenkins-token -n k8s -o jsonpath='{.data.ca\.crt}' > ca.txt
+> ```
+> Don't decode `<CA_DATA>`. The kubeconfig expects base64.
+
 Optionally rename `my-cluster` to something meaningful (e.g. `prod-eks`).
 
 **Test it**
 
 ```sh
-kubectl --kubeconfig kube_config.yml get pods          # works (uses namespace k8s)
-kubectl --kubeconfig kube_config.yml get ns            # Forbidden (expected)
+kubectl --kubeconfig jenkins-kubeconfig.yml get pods   # works (uses namespace k8s)
+kubectl --kubeconfig jenkins-kubeconfig.yml get ns     # Forbidden (expected)
 ```
 
-> ⚠️ Once filled in, `kube_config.yml` contains a live token. Don't commit it. Only the placeholder version belongs in git.
+> ⚠️ `jenkins-kubeconfig.yml` contains a live token. It's git-ignored, so keep it that way. Only the placeholder template `kube_config.yml` belongs in git.
 
 ## 4. Configure Jenkins
 
-1. **Manage Jenkins → Credentials** → add a **Secret file** credential and upload `kube_config.yml`
+1. **Manage Jenkins → Credentials** → add a **Secret file** credential and upload `jenkins-kubeconfig.yml`
    (or a **Secret text** credential with just the token).
 2. **Manage Jenkins → Clouds → New cloud → Kubernetes**:
    - **Credentials**: the kubeconfig credential (URL and CA come from the file).
