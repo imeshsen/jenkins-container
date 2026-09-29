@@ -1,23 +1,20 @@
-# NS=k8s
-# SERVER=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')
-# CA=$(kubectl config view --raw --minify --flatten -o jsonpath='{.clusters[0].cluster.certificate-authority-data}')
-# TOKEN=$(kubectl -n $NS get secret jenkins-token -o jsonpath='{.data.token}' | base64 -d)
-
+# Kubeconfig template for the Jenkins service account.
+# Replace the <PLACEHOLDERS> (see README.md step 3). Don't commit the filled-in file.
 apiVersion: v1
 kind: Config
 clusters:
-- name: minikube
+- name: my-cluster
   cluster:
-    server: $SERVER
-    certificate-authority-data: $CA
+    server: <SERVER_URL>
+    certificate-authority-data: <CA_DATA>
 users:
 - name: jenkins
   user:
-    token: $TOKEN
+    token: <TOKEN>
 contexts:
-- name: jenkins@minikube
+- name: jenkins@my-cluster
   context:
-    cluster: minikube
+    cluster: my-cluster
     user: jenkins
-    namespace: $NS
-current-context: jenkins@minikube
+    namespace: k8s
+current-context: jenkins@my-cluster
