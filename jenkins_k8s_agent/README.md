@@ -31,7 +31,7 @@ kubectl auth can-i list namespaces --as=system:serviceaccount:k8s:jenkins      #
 
 | Placeholder | Command | Notes |
 |---|---|---|
-| `<SERVER_URL>` | `kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}'` | See the cluster table below |
+| `<SERVER_URL>` | `kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}'` | Must be reachable from Jenkins |
 | `<CA_DATA>` | `kubectl get secret jenkins-token -n k8s -o jsonpath='{.data.ca\.crt}'` | Paste as-is (stays base64) |
 | `<TOKEN>` | `kubectl describe secret jenkins-token -n k8s` | Copy the `token:` value (already decoded) |
 
@@ -45,18 +45,6 @@ kubectl --kubeconfig kube_config.yml get ns            # Forbidden (expected)
 ```
 
 > ⚠️ Once filled in, `kube_config.yml` contains a live token. Don't commit it. Only the placeholder version belongs in git.
-
-### Check the `server:` URL for your cluster type
-
-The URL must be reachable **from Jenkins**, not just from your machine.
-
-| Cluster | What to check |
-|---|---|
-| **EKS / AKS / GKE** | URL from the current context is fine. If the API endpoint is private, Jenkins must be in the same VPC/VNet or have network access to it. |
-| **kubeadm / k3s / on-prem** | Replace `127.0.0.1` or `localhost` with the control-plane IP / DNS / load balancer. The name must match a SAN in the API server cert. |
-| **Rancher-managed** | Use the cluster's direct API endpoint, not the Rancher proxy URL (`https://rancher/k8s/clusters/...`), which needs a Rancher token. |
-| **minikube** | `127.0.0.1:<port>` only works on the host. From a Jenkins container, use `https://$(minikube ip):8443` (or put Jenkins on the minikube Docker network). |
-| **Docker Desktop / kind** | From a Jenkins container, use `https://host.docker.internal:<port>` or `https://<kind-control-plane>:6443` on the `kind` network. |
 
 ## 4. Configure Jenkins
 
@@ -75,5 +63,5 @@ The URL must be reachable **from Jenkins**, not just from your machine.
 | `namespaces is forbidden ... cannot list resource "namespaces"` | Set the namespace to `k8s` in Jenkins or use `-n k8s`. Don't grant cluster access. |
 | `x509: certificate signed by unknown authority` | Wrong/missing CA. Regenerate the kubeconfig from the right cluster context. |
 | `x509: certificate is valid for ..., not <host>` | `server:` hostname isn't in the API cert. Use a name/IP the cert covers. |
-| `connection refused` / timeout | `server:` isn't reachable from Jenkins. See the cluster table above. |
+| `connection refused` / timeout | `server:` isn't reachable from Jenkins. Use an address Jenkins can reach, not `127.0.0.1`. |
 | `Unauthorized` | Token is empty or the secret was recreated. Regenerate the kubeconfig. |
