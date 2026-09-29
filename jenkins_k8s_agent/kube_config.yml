@@ -1,0 +1,23 @@
+# NS=k8s
+# SERVER=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')
+# CA=$(kubectl config view --raw --minify --flatten -o jsonpath='{.clusters[0].cluster.certificate-authority-data}')
+# TOKEN=$(kubectl -n $NS get secret jenkins-token -o jsonpath='{.data.token}' | base64 -d)
+
+apiVersion: v1
+kind: Config
+clusters:
+- name: minikube
+  cluster:
+    server: $SERVER
+    certificate-authority-data: $CA
+users:
+- name: jenkins
+  user:
+    token: $TOKEN
+contexts:
+- name: jenkins@minikube
+  context:
+    cluster: minikube
+    user: jenkins
+    namespace: $NS
+current-context: jenkins@minikube
