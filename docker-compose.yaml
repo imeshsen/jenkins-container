@@ -6,8 +6,6 @@ services:
     ports:
       - "8080:8080"
       - "50000:50000"
-        #    environment:
-        #      - JENKINS_OPTS=--httpListenAddress=0.0.0.0
     volumes:
       - ./jenkins_home:/var/jenkins_home
     networks:
